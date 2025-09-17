@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import pandas as pd
 import asyncpg
+import os
 import faiss
 import numpy as np
 from ..config import DATABASE_CONFIG
@@ -10,6 +11,9 @@ router = APIRouter(
     prefix = '/embeddings',
     tags = ["embeddings"]
 )
+
+FAISS_INDEX_PATH = "vector_search/faiss_index/shipments.index"
+MAPPING_PATH = "vector_search/faiss_index/id_mapping.npy"
 
 @router.post("/generate")
 async def generate_embeddings(batch_size: int = 1000):
@@ -28,8 +32,8 @@ async def generate_embeddings(batch_size: int = 1000):
     #create FAISS index
     embedding_dim = 768
     index = faiss.IndexFlatL2(embedding_dim)
-    embeddings_list = []
 
+    embeddings_list = []
     shipment_ids = []
 
     # Generate embeddings in batches
@@ -45,7 +49,11 @@ async def generate_embeddings(batch_size: int = 1000):
     embeddings_array = np.array(embeddings_list).astype('float32')
     index.add(embeddings_array)
 
-    #save FAISS index to disk
-    faiss.write_index(index, "vector_search/faiss_index/shipments.index")
+    # Save FAISS index
+    os.makedirs(os.path.dirname(FAISS_INDEX_PATH), exist_ok=True)
+    faiss.write_index(index, FAISS_INDEX_PATH)
+
+    # Save mapping: FAISS idx → shipment_id
+    np.save(MAPPING_PATH, np.array(shipment_ids))
 
     return {"status": "success", "num_embeddings": len(embeddings_list)}
