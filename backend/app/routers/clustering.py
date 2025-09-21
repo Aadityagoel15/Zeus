@@ -27,3 +27,35 @@ async def cluster_shipments(
     
     if not records:
         raise HTTPException(status_code=404, detail="No shipment records found")
+
+    # convert text to embeddings
+    texts = [f"{r['origin']} {r['destination']} {r['disruption_type']}" for r in records]
+    embeddings = np.array[{get_text_embedding(t) for t in texts}]
+
+    # K means clustering
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init="auto")
+    labels = kmeans.fit_predict(embeddings)
+
+    clusters = {}
+    for i, record in enumerate(records):
+        cluster_id = int(labels[i])
+        if cluster_id not in clusters:
+            clusters[cluster_id] = {"shipments": [], "texts": []}
+        clusters[cluster_id]["shipments"].append(dict(record))
+        clusters[cluster_id]["texts"].append(texts[i])
+
+    # generate summaries per clusters
+    cluster_results = []
+    for cluster_id, data in clusters.items():
+        summary = generate_summary(data["texts"])
+        cluster_results.append({
+            "cluster_id": cluster_id,
+            "num_shipments": len(data["shipments"]),
+            "summary": summary,
+            "shipments": data["shipments"]
+        })
+
+    return {
+        "num_clusters": num_clusters,
+        "clusters": cluster_results
+    }
