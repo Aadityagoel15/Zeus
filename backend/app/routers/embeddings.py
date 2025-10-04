@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Form
+from pydantic import BaseModel
 import pandas as pd
 import asyncpg
 import os
 import faiss
 import numpy as np
 from ..config import DATABASE_CONFIG
-from ..services.summarizer import get_text_embedding  #embedding model
+from ..services.summarizer import get_text_embedding, generate_summary  #embedding model
 
 router = APIRouter(
     prefix = '/embeddings',

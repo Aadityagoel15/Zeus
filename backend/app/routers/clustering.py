@@ -6,7 +6,7 @@ import os
 from sklearn.cluster import KMeans
 
 from ..config import DATABASE_CONFIG
-from ..services.summarizer import get_text_embedding  # embedding model
+from ..services.summarizer import get_text_embedding, generate_summary # embedding model
 
 router = APIRouter(
     prefix="/clustering",
