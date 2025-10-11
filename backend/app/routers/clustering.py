@@ -30,7 +30,7 @@ async def cluster_shipments(
 
     # convert text to embeddings
     texts = [f"{r['origin']} {r['destination']} {r['disruption_type']}" for r in records]
-    embeddings = np.array[{get_text_embedding(t) for t in texts}]
+    embeddings = np.array([await get_text_embedding(t) for t in texts])
 
     # K means clustering
     kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init="auto")
@@ -47,7 +47,7 @@ async def cluster_shipments(
     # generate summaries per clusters
     cluster_results = []
     for cluster_id, data in clusters.items():
-        summary = generate_summary(data["texts"])
+        summary = await generate_summary(data["texts"])
         cluster_results.append({
             "cluster_id": cluster_id,
             "num_shipments": len(data["shipments"]),
