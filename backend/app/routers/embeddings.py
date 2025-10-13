@@ -37,7 +37,8 @@ async def generate_embeddings(batch_size: int = 512, summarize: bool = False):
         raise HTTPException(status_code=404, detail="No shipment records found")
 
     # Convert to DataFrame
-    df = pd.DataFrame(records, columns=["shipment_id", "origin", "destination", "disruption_type"])
+    # Convert asyncpg records to DataFrame
+    df = pd.DataFrame([dict(r) for r in records])
 
     # === Initialize FAISS index ===
     embedding_dim = 384  # for all-MiniLM-L6-v2
