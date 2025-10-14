@@ -15,6 +15,27 @@ router = APIRouter(
 FAISS_INDEX_PATH = "vector_search/faiss_index/shipments.index"
 MAPPING_PATH = "vector_search/faiss_index/id_mapping.npy"
 
+# Expected CSV format (shown if user hasn’t uploaded or generated embeddings yet)
+EXPECTED_COLUMNS = [
+    "shipment_id",
+    "origin",
+    "destination",
+    "disruption_type",
+    "summary",
+    "delay_days",
+    "risk_score"
+]
+
+SAMPLE_ROW = {
+    "shipment_id": "SHP_001",
+    "origin": "Delhi",
+    "destination": "Mumbai",
+    "disruption_type": "Delay due to weather",
+    "summary": "Heavy rainfall caused delays in northern route.",
+    "delay_days": 3,
+    "risk_score": 0.78
+}
+
 
 @router.get("/")
 async def semantic_search(
@@ -23,17 +44,23 @@ async def semantic_search(
 ):
     """
     Perform semantic search using FAISS + HuggingFace embeddings.
-    Returns top-k most semantically similar shipments.
+    If FAISS index not found, show expected CSV format to guide upload.
     """
 
-    # === Check FAISS index ===
+    # === Check FAISS index existence ===
     if not os.path.exists(FAISS_INDEX_PATH) or not os.path.exists(MAPPING_PATH):
         raise HTTPException(
-            status_code=500,
-            detail="FAISS index not found. Please run /embeddings/generate first."
+            status_code=400,
+            detail={
+                "message": "FAISS index not found. Please upload your dataset and run /embeddings/generate first.",
+                "expected_csv_format": {
+                    "expected_columns": EXPECTED_COLUMNS,
+                    "example_row": SAMPLE_ROW
+                }
+            }
         )
 
-    # === Load FAISS and ID mapping ===
+    # === Load FAISS index and ID mapping ===
     index = faiss.read_index(FAISS_INDEX_PATH)
     id_mapping = np.load(MAPPING_PATH, allow_pickle=True)
 
@@ -45,13 +72,13 @@ async def semantic_search(
     # === Perform FAISS search ===
     distances, indices = index.search(query_embedding, top_k)
 
-    # === Retrieve matched shipment IDs ===
+    # === Retrieve shipment IDs ===
     shipment_ids = [str(id_mapping[idx]) for idx in indices[0] if 0 <= idx < len(id_mapping)]
 
     if not shipment_ids:
         raise HTTPException(status_code=404, detail="No relevant shipments found.")
 
-    # === Fetch matching shipments from DB ===
+    # === Fetch records from PostgreSQL ===
     try:
         conn = await asyncpg.connect(**DATABASE_CONFIG)
         rows = await conn.fetch(
@@ -64,13 +91,13 @@ async def semantic_search(
         )
         await conn.close()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DB fetch error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database fetch error: {str(e)}")
 
-    # === Normalize distances (smaller = more similar) ===
+    # === Normalize similarity scores ===
     max_dist = np.max(distances)
     normalized_scores = 1 - (distances[0] / max_dist) if max_dist > 0 else np.ones_like(distances[0])
 
-    # === Combine results with similarity scores ===
+    # === Combine results ===
     results = []
     for i, record in enumerate(rows):
         results.append({
