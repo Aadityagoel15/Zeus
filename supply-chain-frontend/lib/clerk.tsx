@@ -1,4 +1,4 @@
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { ReactNode } from "react";
 
 export const clerkConfig = {
